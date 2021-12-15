@@ -81,16 +81,26 @@ locals {
   elasticache_member_clusters = module.this.enabled ? tolist(aws_elasticache_replication_group.default.0.member_clusters) : []
 }
 
+resource "random_id" "default" {
+  keepers = {
+    family = var.family
+  }
+
+  byte_length = 2
+}
+
 resource "aws_elasticache_subnet_group" "default" {
   count       = module.this.enabled && var.elasticache_subnet_group_name == "" && length(var.subnets) > 0 ? 1 : 0
   name        = module.this.id
   description = "Elasticache subnet group for ${module.this.id}"
   subnet_ids  = var.subnets
+
+  tags = module.this.tags
 }
 
 resource "aws_elasticache_parameter_group" "default" {
   count       = module.this.enabled ? 1 : 0
-  name        = module.this.id
+  name        = "${module.this.id}-${random_id.default.hex}"
   description = "Elasticache parameter group for ${module.this.id}"
   family      = var.family
 
@@ -101,6 +111,12 @@ resource "aws_elasticache_parameter_group" "default" {
       value = tostring(parameter.value.value)
     }
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = module.this.tags
 }
 
 resource "aws_elasticache_replication_group" "default" {
